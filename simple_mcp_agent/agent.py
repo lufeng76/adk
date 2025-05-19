@@ -6,7 +6,7 @@ from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParamet
 MODEL_GEMINI_2_5_FLASH = "litellm_proxy/gemini-2.5-flash"
 API_BASE_URL = "https://litellm-cloudrun-988469099469.us-central1.run.app/"
 API_KEY = "sk-8wdj4Py_SG1-LgtnW10fwg"
-google_maps_api_key="AIzaSyAeDVDHNWvnBX8SWl_98ZUAu1CtjCnrusc"
+google_maps_api_key=""
 
 async def create_agent():
   """Gets tools from MCP Server."""
