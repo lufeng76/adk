@@ -1,3 +1,5 @@
+import os
+
 from contextlib import AsyncExitStack
 from google.adk.agents import  Agent
 from google.adk.models.lite_llm import LiteLlm # For multi-model support
@@ -5,8 +7,9 @@ from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParamet
 
 MODEL_GEMINI_2_5_FLASH = "litellm_proxy/gemini-2.5-flash"
 API_BASE_URL = "https://litellm-cloudrun-988469099469.us-central1.run.app/"
-API_KEY = "sk-8wdj4Py_SG1-LgtnW10fwg"
-google_maps_api_key=""
+API_KEY = os.getenv("LITELLM_MODEL_API")
+
+google_maps_api_key = os.getenv("GOOGLE_MAP_API")
 
 async def create_agent():
   """Gets tools from MCP Server."""
