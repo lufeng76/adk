@@ -1,5 +1,5 @@
 
-### Deploy Agent
+### Deploy Agent to Cloud Run
 ```
 export GOOGLE_CLOUD_PROJECT=lufeng-demo
 export GOOGLE_CLOUD_LOCATION=us-central1

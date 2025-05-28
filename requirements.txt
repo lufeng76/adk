@@ -1,4 +1,7 @@
-google_adk
+google-adk
+google-genai
+pandas
+db-dtypes
 litellm
 toolbox-langchain
 langchain
