@@ -18,7 +18,7 @@ import datetime
 import logging
 import os
 import re
-
+import requests
 
 from billing_agent.utils.utils import get_env_var
 from google.adk.tools import ToolContext
@@ -48,6 +48,25 @@ MAX_NUM_ROWS = 80
 database_settings = None
 bq_client = None
 
+billing_uri = "https://cloud.google.com/billing/docs/how-to/export-data-bigquery-tables/detailed-usage"
+
+def fetch_web_content(url):
+    """
+    Fetch content from a web URL.
+    
+    Args:
+        url (str): The URL to fetch content from
+        
+    Returns:
+        str: The HTML content of the webpage
+    """
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        return response.text
+    except Exception as e:
+        print(f"Error fetching content from {url}: {e}")
+        return None
 
 def get_bq_client():
     """Get BigQuery client."""
@@ -226,9 +245,11 @@ The database structure is defined by the following table schemas (possibly with 
     content_parts = [
         # Add the text prompt as the first part
         types.Part.from_text(text=prompt),
+        # Add the biling mannual from a web URI
+        types.Part.from_text(text=fetch_web_content(billing_uri)),        
         # Add the PDF file from a GCS URI
-        types.Part.from_uri(
-            file_uri="gs://sunivy-for-example-public/Structure of Detailed data export  _  Cloud Billing  _  Google Cloud.pdf", mime_type="application/pdf")
+        # types.Part.from_uri(
+        #     file_uri="gs://sunivy-for-example-public/Structure of Detailed data export  _  Cloud Billing  _  Google Cloud.pdf", mime_type="application/pdf")
     ]
 
     try:
