@@ -49,6 +49,7 @@ database_settings = None
 bq_client = None
 
 billing_uri = "https://cloud.google.com/billing/docs/how-to/export-data-bigquery-tables/detailed-usage"
+billing_sample_uri = "https://cloud.google.com/billing/docs/how-to/bq-examples"
 
 def fetch_web_content(url):
     """
@@ -246,7 +247,9 @@ The database structure is defined by the following table schemas (possibly with 
         # Add the text prompt as the first part
         types.Part.from_text(text=prompt),
         # Add the biling mannual from a web URI
-        types.Part.from_text(text=fetch_web_content(billing_uri)),        
+        types.Part.from_text(text=fetch_web_content(billing_uri)),    
+        # Add the biling sample from a web URI
+        types.Part.from_text(text=fetch_web_content(billing_sample_uri)),               
         # Add the PDF file from a GCS URI
         # types.Part.from_uri(
         #     file_uri="gs://sunivy-for-example-public/Structure of Detailed data export  _  Cloud Billing  _  Google Cloud.pdf", mime_type="application/pdf")
