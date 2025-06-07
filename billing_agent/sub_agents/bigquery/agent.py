@@ -54,6 +54,7 @@ database_agent = Agent(
             if NL2SQL_METHOD == "CHASE"
             else tools.initial_bq_nl2sql
         ),
+        tools.expand_to_actual_billing_tables,
         tools.run_bigquery_validation,
     ],
     before_agent_callback=setup_before_agent_call,
