@@ -110,13 +110,14 @@ def update_database_settings():
     logging.info(
         f"Getting schema for dataset {dataset_id} in project {project_id}")
 
-    ddl_schema = get_bigquery_schema(
+    ddl_schema, table_id = get_bigquery_schema(
         dataset_id,
         client=get_bq_client(),
         project_id=project_id,
     )
 
     database_settings = {
+        "prototype_billing_table": table_id,
         "bq_project_id": project_id,
         "bq_dataset_id": dataset_id,
         "bq_ddl_schema": ddl_schema,
@@ -145,8 +146,12 @@ def get_bigquery_schema(dataset_id, client=None, project_id=None):
     dataset_ref = bigquery.DatasetReference(project_id, dataset_id)
 
     ddl_statements = ""
+    table_id = ""
 
     for table in client.list_tables(dataset_ref):
+        if 'gcp_billing_export_resource_v1_' not in table.table_id:
+            continue
+        table_id = table.table_id
         table_ref = dataset_ref.table(table.table_id)
         table_obj = client.get_table(table_ref)
 
@@ -187,7 +192,7 @@ def get_bigquery_schema(dataset_id, client=None, project_id=None):
 
         ddl_statements += ddl_statement
 
-    return ddl_statements
+    return ddl_statements, table_id
 
 
 def initial_bq_nl2sql(
@@ -390,16 +395,13 @@ def run_bigquery_validation(
     return final_result
 
 
-def expand_to_actual_billing_tables(question: str, raw_sql:str, tool_context: ToolContext):
-    
+def expand_to_actual_billing_tables(question: str, raw_sql: str, tool_context: ToolContext):
+
     prompt_template = """
-You will be given an input SQL statement that operates on a single Google Cloud Platform (GCP) billing export table: gcc-billing-export.gcc_billing_export_global.gcp_billing_export_resource_v1_0189FA_E139FD_136A58.
+You will be given an input SQL statement that operates on a single Google Cloud Platform (GCP) billing export table: `{prototype_table}`.
 Your task is to adapt this SQL statement to work with four different customer-specific GCP billing export tables. These customer tables share the exact same schema and logical structure as the original table.
 The four customer billing tables are:
-bytedance-cloud-216403.billing.gcp_billing_export_resource_v1_01A25B_AA5CE5_4FBF3D
-bytedance-sg-default.billing.gcp_billing_export_resource_v1_011EDB_66A1D4_6F52D1
-billing-bytedance-pte-ltd.billing.gcp_billing_export_resource_v1_01CE7C_C65FA9_96EB60
-bytedance-europe-default.billing.gcp_billing_export_resource_v1_015E0B_265CB2_E78BC8
+{target_tables}
 
 Requirements for the Output SQL:
 1. Combine Data: Use UNION ALL to combine data from the four customer billing tables.
@@ -423,8 +425,13 @@ input SQL:
 output SQL:
     
     """
+    prototype_billing_table = tool_context.state["database_settings"]["prototype_billing_table"]
 
+    project_list = os.getenv('TARGET_BILLING_TABLES',
+                             prototype_billing_table).split(',')
     prompt = prompt_template.format(
+        prototype_table=prototype_billing_table,
+        target_tables='/n'.join(project_list),
         raw_sql=raw_sql, question=question
     )
 

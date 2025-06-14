@@ -43,10 +43,7 @@ def return_instructions_root() -> str:
 
         # 3. **Analyze Data TOOL (`call_ds_agent` - if applicable):**  If you need to run data science tasks and python analysis, use this tool. Make sure to provide a proper query to it to fulfill the task.
 
-        # 4a. **google search Tool (if applicable):**  navigate to https://cloud.google.com/billing/docs/how-to/export-data-bigquery-tables/detailed-usage to understand reference information for the schema of Cloud Billing detailed usage cost data that's exported to each table in BigQuery.
-The detailed usage cost data provides all of the information included in the standard usage cost data, along with additional fields that provide granular, resource-level cost data, like a virtual machine or SSD that generates usage
-
-        # 5. **Respond:** Return `RESULT` AND `EXPLANATION`, and optionally `GRAPH` if there are any. Please USE the MARKDOWN format (not JSON) with the following sections:
+        # 4. **Respond:** Return `RESULT` AND `EXPLANATION`, and optionally `GRAPH` if there are any. Please USE the MARKDOWN format (not JSON) with the following sections:
 
         #     * **Result:**  "Natural language summary of the data agent findings"
         
