@@ -18,11 +18,12 @@ import datetime
 import logging
 import os
 import re
+import requests
 
 # from data_science.utils.utils import get_env_var
 from google.adk.tools import ToolContext
 from google.cloud import bigquery
-from google.genai import Client
+from google.genai import Client, types
 
 # from .chase_sql import chase_constants
 
@@ -37,6 +38,27 @@ MAX_NUM_ROWS = 80
 
 database_settings = None
 bq_client = None
+
+billing_uri = "https://cloud.google.com/billing/docs/how-to/export-data-bigquery-tables/detailed-usage"
+billing_sample_uri = "https://cloud.google.com/billing/docs/how-to/bq-examples"
+
+def fetch_web_content(url):
+    """
+    Fetch content from a web URL.
+    
+    Args:
+        url (str): The URL to fetch content from
+        
+    Returns:
+        str: The HTML content of the webpage
+    """
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        return response.text
+    except Exception as e:
+        print(f"Error fetching content from {url}: {e}")
+        return None
 
 def get_env_var(var_name):
   """Retrieves the value of an environment variable.
@@ -207,9 +229,22 @@ The database structure is defined by the following table schemas (possibly with 
         MAX_NUM_ROWS=MAX_NUM_ROWS, SCHEMA=ddl_schema, QUESTION=question
     )
 
+    # Create content parts
+    content_parts = [
+        # Add the text prompt as the first part
+        types.Part.from_text(text=prompt),
+        # Add the biling mannual from a web URI
+        types.Part.from_text(text=fetch_web_content(billing_uri)),    
+        # Add the biling sample from a web URI
+        types.Part.from_text(text=fetch_web_content(billing_sample_uri)),               
+        # Add the PDF file from a GCS URI
+        # types.Part.from_uri(
+        #     file_uri="gs://sunivy-for-example-public/Structure of Detailed data export  _  Cloud Billing  _  Google Cloud.pdf", mime_type="application/pdf")
+    ]    
+
     response = llm_client.models.generate_content(
         model=os.getenv("BASELINE_NL2SQL_MODEL"),
-        contents=prompt,
+        contents=content_parts,
         config={"temperature": 0.1},
     )
 
