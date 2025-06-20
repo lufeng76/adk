@@ -33,6 +33,9 @@ async def call_db_agent(
         f' {tool_context.state["all_db_settings"]["use_database"]}'
     )
 
+
+    # tool_context.state["db_question"] = question
+
     agent_tool = AgentTool(agent=db_agent)
 
     db_agent_output = await agent_tool.run_async(

@@ -39,7 +39,7 @@ database_agent = Agent(
     model=os.getenv("BIGQUERY_AGENT_MODEL"),
     name="database_agent",
     instruction=return_instructions_bigquery(),
-    tools=[tools.initial_bq_nl2sql,tools.run_bigquery_validation],
+    tools=[tools.initial_bq_nl2sql,tools.expand_to_actual_billing_tables,tools.run_bigquery_validation],
     before_agent_callback=setup_before_agent_call,
     generate_content_config=types.GenerateContentConfig(temperature=0.01),
 )

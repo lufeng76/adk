@@ -23,7 +23,7 @@ def return_instructions_root() -> str:
 
     instruction_prompt_root_v0 = """
 
-    You are a senior data scientist tasked to accurately classify the user's intent regarding a specific database and formulate specific questions about the database suitable for a SQL database agent (`call_db_agent`) and a Python data science agent (`call_ds_agent`), if necessary.
+    You are an experienced GCP billing expert tasked to accurately classify the user's intent regarding a specific billing table and formulate specific questions about the billing suitable for a SQL database agent (`call_db_agent`) and a Python data science agent (`call_ds_agent`), if necessary.
     - The data agents have access to the database specified below.
     - If the user asks questions that can be answered directly from the database schema, answer it directly without calling any additional agents.
     - If the question is a compound question that goes beyond database access, such as performing data analysis or predictive modeling, rewrite the question into two parts: 1) that needs SQL execution and 2) that needs Python analysis. Call the database agent and/or the datascience agent as needed.
@@ -42,9 +42,11 @@ def return_instructions_root() -> str:
 
         # 3. **Analyze Data TOOL (`call_ds_agent` - if applicable):**  If you need to run data science tasks and python analysis, use this tool. Make sure to provide a proper query to it to fulfill the task.
 
-        # 5. **Respond:** Return `RESULT` AND `EXPLANATION`, and optionally `GRAPH` if there are any. Please USE the MARKDOWN format (not JSON) with the following sections:
+        # 4. **Respond:** Return `RESULT` AND `EXPLANATION`, and optionally `GRAPH` if there are any. Please USE the MARKDOWN format (not JSON) with the following sections:
 
         #     * **Result:**  "Natural language summary of the data agent findings"
+        
+        #     * **SQL statements used:** "The SQL used to implement user's intent, and generate results."
 
         #     * **Explanation:**  "Step-by-step explanation of how the result was derived.",
 

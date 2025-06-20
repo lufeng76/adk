@@ -98,12 +98,13 @@ def get_database_settings():
 def update_database_settings():
     """Update database settings."""
     global database_settings
-    ddl_schema = get_bigquery_schema(
+    ddl_schema,table_id = get_bigquery_schema(
         get_env_var("BQ_DATASET_ID"),
         client=get_bq_client(),
         project_id=get_env_var("BQ_PROJECT_ID"),
     )
     database_settings = {
+        "prototype_billing_table": table_id,        
         "bq_project_id": get_env_var("BQ_PROJECT_ID"),
         "bq_dataset_id": get_env_var("BQ_DATASET_ID"),
         "bq_ddl_schema": ddl_schema,
@@ -132,8 +133,12 @@ def get_bigquery_schema(dataset_id, client=None, project_id=None):
     dataset_ref = bigquery.DatasetReference(project_id, dataset_id)
 
     ddl_statements = ""
+    table_id = ""
 
     for table in client.list_tables(dataset_ref):
+        if 'gcp_billing_export_resource_v1_' not in table.table_id:
+            continue
+        table_id = table.table_id        
         table_ref = dataset_ref.table(table.table_id)
         table_obj = client.get_table(table_ref)
 
@@ -174,7 +179,7 @@ def get_bigquery_schema(dataset_id, client=None, project_id=None):
 
         ddl_statements += ddl_statement
 
-    return ddl_statements
+    return ddl_statements, table_id
 
 
 def initial_bq_nl2sql(
@@ -242,20 +247,28 @@ The database structure is defined by the following table schemas (possibly with 
         #     file_uri="gs://sunivy-for-example-public/Structure of Detailed data export  _  Cloud Billing  _  Google Cloud.pdf", mime_type="application/pdf")
     ]    
 
-    response = llm_client.models.generate_content(
-        model=os.getenv("BASELINE_NL2SQL_MODEL"),
-        contents=content_parts,
-        config={"temperature": 0.1},
-    )
+    try:
+        response = llm_client.models.generate_content(
+            model=os.getenv("BASELINE_NL2SQL_MODEL"),
+            contents=content_parts,
+            config={"temperature": 0.1},
+        )
 
-    sql = response.text
+        sql = response.text
+    except Exception as e:
+        logging.error(f"Error using Vertex AI model: {e}")
+        # Fallback to LiteLLM
+        logging.info("Falling back to LiteLLM")
+        raise
+
+    logging.info(prompt)
+    
     if sql:
         sql = sql.replace("```sql", "").replace("```", "").strip()
 
-    print("\n sql:", sql)
-
-    tool_context.state["sql_query"] = sql
-
+    tool_context.state["raw_sql"] = sql
+    tool_context.state["question"] = question
+    
     return sql
 
 
@@ -364,3 +377,68 @@ def run_bigquery_validation(
     print("\n run_bigquery_validation final_result: \n", final_result)
 
     return final_result
+
+def expand_to_actual_billing_tables(question: str, raw_sql: str, tool_context: ToolContext):
+
+    prompt_template = """
+You will be given an input SQL statement that operates on a single Google Cloud Platform (GCP) billing export table: `{prototype_table}`.
+Your task is to adapt this SQL statement to work with a list of different customer-specific GCP billing export tables. These customer tables share the exact same schema and logical structure as the original table.
+The four customer billing tables are:
+{target_tables}
+
+Requirements for the Output SQL:
+1. Combine Data: Use UNION ALL to combine data from the a list of customer billing tables. If there is only one table, use that table directly without UNION ALL.
+1.1 In order to generate valid SQL, please list all columns in the union statement, instead of select *, eg. SELECT billing_account_id, service, sku, usage_start_time, usage_end_time, `project`, `labels`, `system_labels`, location, resource, `tags`, export_time, cost, currency, currency_conversion_rate, usage, `credits`, invoice, cost_type, adjustment_info, price, cost_at_list, transaction_type, seller_name, subscription FROM ...
+2. Partition Filtering:
+2.1 For each individual customer table query within the UNION ALL structure, add a WHERE clause to filter on the _PARTITIONTIME pseudo-column.
+2.2 The filter condition should be: TIMESTAMP_TRUNC(_PARTITIONTIME, DAY) BETWEEN relevant_query_start_date_minus_1_month AND relevant_query_end_date_plus_1_month.
+2.2.1 relevant_query_start_date_minus_1_month and relevant_query_end_date_plus_1_month should be a YYYY-MM-DD STRING, DO NOT CAST IT INTO DATE TYPE. eg: TIMESTAMP_TRUNC(_PARTITIONTIME, DAY) BETWEEN '2024-01-01' AND '2024-03-31'
+2.3 Determining the range:
+2.3.1 Identify if the original input SQL has any date range filters, on usage_start_time or invoice.month.
+2.3.2 If such filters exist, relevant_query_start_date_minus_1_month should be approximately 1 month before the earliest date in those filters, and relevant_query_end_date_plus_1_month should be approximately 1 month after the latest date.
+2.3.3 If the original query does not have explicit date range filters, do not add partition filtering.
+3. Apply Original Logic: The overall structure of the original input SQL (its SELECT list, main WHERE conditions (other than the new partition filter), GROUP BY, JOINs, etc.) should be applied to the result of the UNION ALL of the pre-filtered customer tables. This typically means the UNION ALL part will be in a Common Table Expression (CTE) or a subquery.
+
+question:
+{question}
+
+input SQL:
+{raw_sql}
+
+output SQL:
+    
+    """
+    prototype_billing_table = tool_context.state["database_settings"]["prototype_billing_table"]
+
+    project_list = os.getenv('TARGET_BILLING_TABLES',
+                             prototype_billing_table).split(',')
+    prompt = prompt_template.format(
+        prototype_table=prototype_billing_table,
+        target_tables='/n'.join(project_list),
+        raw_sql=raw_sql, question=question
+    )
+
+    # Create a list of content parts including both the text prompt and PDF
+    from google.genai import types
+
+    # Create content parts
+    content_parts = [
+        types.Part.from_text(text=prompt),
+    ]
+
+    try:
+        response = llm_client.models.generate_content(
+            model=os.getenv("BASELINE_NL2SQL_MODEL",
+                            "gemini-2.5-pro-preview-05-06"),
+            contents=content_parts,
+            config={"temperature": 0.1},
+        )
+        sql = response.text
+    except Exception as e:
+        logging.error(f"Error using Vertex AI model: {e}")
+        logging.info("Falling back to LiteLLM")
+        raise
+
+    tool_context.state["final_sql"] = sql
+
+    return sql

@@ -26,6 +26,9 @@ from google.adk.agents import Agent
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.tools import load_artifacts
 
+from google.adk.models import LlmResponse, LlmRequest
+
+
 # from .sub_agents import bqml_agent
 from .sub_agents.bigquery.tools import (
     get_database_settings as get_bq_database_settings,
@@ -38,6 +41,11 @@ date_today = date.today()
 
 def setup_before_agent_call(callback_context: CallbackContext):
     """Setup the agent."""
+
+    # callback_context.state["db_question"] = ''
+    callback_context.state["question"] = ''
+    callback_context.state["raw_sql"] = ''
+    callback_context.state["final_sql"] = ''
 
     # setting up database settings in session.state
     if "database_settings" not in callback_context.state:
@@ -60,6 +68,31 @@ def setup_before_agent_call(callback_context: CallbackContext):
     """
         )
 
+def after_call_back(callback_context: CallbackContext):
+    print("**********************************************")
+    # print(callback_context.state.to_dict()['sql_query'])
+    print(callback_context.state.to_dict()['question'])
+    print(callback_context._invocation_context.session.id,)
+    print(callback_context._invocation_context.user_content.to_json_dict(),)
+    print(callback_context.state.to_dict()['raw_sql'],)
+    print(callback_context.state.to_dict()['final_sql'],)
+    print("**********************************************")
+
+# --- Define the Callback Function ---
+def before_model_callback(
+    callback_context: CallbackContext, llm_request: LlmRequest
+):
+    """Inspects/modifies the LLM request or skips the call."""
+    agent_name = callback_context.agent_name
+    print(f"[Callback] Before model call for agent: {agent_name}")
+
+    # Inspect the last user message in the request contents
+    last_user_message = ""
+    if llm_request.contents and llm_request.contents[-1].role == 'user':
+         if llm_request.contents[-1].parts:
+            last_user_message = llm_request.contents[-1].parts[0].text
+    print(f"[Callback] Inspecting last user message: '{last_user_message}'")
+    callback_context.state["raw_question"] = last_user_message
 
 root_agent = Agent(
     model=os.getenv("ROOT_AGENT_MODEL"),
@@ -78,5 +111,7 @@ root_agent = Agent(
         load_artifacts,
     ],
     before_agent_callback=setup_before_agent_call,
+    after_agent_callback=after_call_back,
+#   before_model_callback=before_model_callback,
     generate_content_config=types.GenerateContentConfig(temperature=0.01),
 )
